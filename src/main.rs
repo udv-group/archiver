@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use bzip2::read::BzEncoder;
-use bzip2::Compression;
 use clap::{ArgAction, Parser, ValueEnum};
+use flate2::write::{GzEncoder, ZlibEncoder};
 use md5::Digest;
 
 use serde_json::json;
@@ -12,7 +12,7 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::{env, fs};
-use tar::{Header, EntryType};
+use tar::{EntryType, Header};
 
 /// Simple program to greet a person
 #[derive(Parser)]
@@ -25,19 +25,23 @@ struct Cli {
     #[arg(long, short)]
     output: Option<PathBuf>,
     /// Compression algorithm
-    #[arg(long, short, value_enum, default_value_t = Comp::BZ2)]
+    #[arg(long, short, value_enum, default_value_t = Comp::BZIP2)]
     compression: Comp,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum Comp {
-    BZ2,
+    BZIP2,
+    GZIP,
+    ZLIB,
 }
 
 impl Display for Comp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let repr = match self {
-            Comp::BZ2 => "bz2",
+            Comp::BZIP2 => "bz2",
+            Comp::GZIP => "gz",
+            Comp::ZLIB => "zlib",
         };
         write!(f, "{}", repr)
     }
@@ -51,13 +55,13 @@ fn main() -> Result<()> {
         .expect("Unable to read current directory");
 
     output = sanitize_path(output, cli.compression);
-    let all_files = resolve_input(cli.input)?;
+    let all_files = resolve_paths(cli.input)?;
     let mut hashes: HashMap<String, String> = HashMap::new();
-    
-    let tar_bz2 = File::create(output)?;
-    let enc = BzEncoder::new(tar_bz2, Compression::best());
+
+    let tar = File::create(output)?;
+    let enc = create_encoder(cli.compression, tar);
     let mut tar = tar::Builder::new(enc);
-    
+
     for file_path in all_files {
         let hash = calculate_md5(&file_path)?;
         let mut file = File::open(&file_path)?;
@@ -78,6 +82,14 @@ fn main() -> Result<()> {
     )?;
     tar.finish()?;
     Ok(())
+}
+
+fn create_encoder(comp: Comp, file: File) -> Box<dyn Write> {
+    match comp {
+        Comp::BZIP2 => Box::new(BzEncoder::new(file, bzip2::Compression::best())),
+        Comp::GZIP => Box::new(GzEncoder::new(file, flate2::Compression::best())),
+        Comp::ZLIB => Box::new(ZlibEncoder::new(file, flate2::Compression::best())),
+    }
 }
 
 fn create_header<P: AsRef<Path>>(path: P, size: u64) -> Result<Header> {
@@ -117,7 +129,7 @@ fn read_dir(dir: PathBuf, entries: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn resolve_input(paths: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+fn resolve_paths(paths: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
     let mut entries: Vec<PathBuf> = vec![];
     for path in paths {
         if !path.exists() {
