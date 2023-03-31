@@ -25,23 +25,23 @@ struct Cli {
     #[arg(long, short)]
     output: Option<PathBuf>,
     /// Compression algorithm
-    #[arg(long, short, value_enum, default_value_t = Comp::BZIP2)]
+    #[arg(long, short, value_enum, default_value_t = Comp::Bzip2)]
     compression: Comp,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum Comp {
-    BZIP2,
-    GZIP,
-    ZLIB,
+    Bzip2,
+    Gzip,
+    Zlib,
 }
 
 impl Display for Comp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let repr = match self {
-            Comp::BZIP2 => "bz2",
-            Comp::GZIP => "gz",
-            Comp::ZLIB => "zlib",
+            Comp::Bzip2 => "bz2",
+            Comp::Gzip => "gz",
+            Comp::Zlib => "zlib",
         };
         write!(f, "{}", repr)
     }
@@ -86,9 +86,9 @@ fn main() -> Result<()> {
 
 fn create_encoder(comp: Comp, file: File) -> Box<dyn Write> {
     match comp {
-        Comp::BZIP2 => Box::new(BzEncoder::new(file, bzip2::Compression::best())),
-        Comp::GZIP => Box::new(GzEncoder::new(file, flate2::Compression::best())),
-        Comp::ZLIB => Box::new(ZlibEncoder::new(file, flate2::Compression::best())),
+        Comp::Bzip2 => Box::new(BzEncoder::new(file, bzip2::Compression::best())),
+        Comp::Gzip => Box::new(GzEncoder::new(file, flate2::Compression::best())),
+        Comp::Zlib => Box::new(ZlibEncoder::new(file, flate2::Compression::best())),
     }
 }
 
