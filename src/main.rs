@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use bzip2::read::BzEncoder;
+use bzip2::write::BzEncoder;
 use clap::{ArgAction, Parser, ValueEnum};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use md5::Digest;
